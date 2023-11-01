@@ -27,6 +27,14 @@ class ChatMessageSentEvent extends ChatEvent {
   @override
   List<Object> get props => [message];
 }
+class ChatPhotoSelectedState extends ChatEvent {
+  const ChatPhotoSelectedState(this.photoStr);
+
+  final String photoStr;
+
+  @override
+  List<Object> get props => [photoStr];
+}
 
 class ChatMessageDeletedEvent extends ChatEvent {
   const ChatMessageDeletedEvent(this.message);
@@ -45,3 +53,5 @@ class ChatMessageEditedEvent extends ChatEvent {
   @override
   List<Object> get props => [message];
 }
+
+

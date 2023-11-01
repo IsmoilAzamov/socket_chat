@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:socket/domain/chat_model.dart';
 
+import '../../../main.dart';
 import 'chat_event.dart';
 import 'chat_state.dart';
 
@@ -13,6 +14,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ChatBloc() : super(ChatInitialState()) {
     on<ChatStartedEvent>((event, emit) {
       // channel.sink.add('{"event":"pusher:subscribe","data":{"channel":"Test"}}');
+      List<dynamic> list = box.get('messages', defaultValue: []);
+      messages = list.map((e) => e as MessageModel).toList();
 
       emit(ChatMessagesLoadedState(messages));
     });
@@ -23,8 +26,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         time: DateTime.now().toString(),
         isMe: false,
         isRead: false,
+        isPhoto: false,
+        isSelected: false,
       );
       messages.add(messageModel);
+      box.put('messages', messages);
 
       emit(ChatMessagesLoadedState(messages));
     });
@@ -34,9 +40,30 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         time: DateTime.now().toString(),
         isMe: true,
         isRead: true,
+        isPhoto: false,
+        isSelected: false,
       );
+
       messages.add(messageModel);
+      box.put('messages', messages);
       emit(ChatMessagesLoadedState(messages));
+    });
+    on<ChatPhotoSelectedState>((event, emit) {
+      MessageModel messageModel = MessageModel(
+        message: event.photoStr,
+        time: DateTime.now().toString(),
+        isMe: true,
+        isRead: true,
+        isPhoto: true,
+        isSelected: false,
+      );
+
+      messages.add(messageModel);
+      box.put('messages', messages);
+
+
+      emit(ChatMessagesLoadedState(messages));
+
     });
     // channel.stream.listen((event) {
     //   print(event);
