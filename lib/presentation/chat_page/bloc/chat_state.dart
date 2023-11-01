@@ -41,3 +41,12 @@ class ChatMessageDeletedState extends ChatState {
   List<Object> get props => [message];
 }
 
+class ChatMessagesErrorState extends ChatState {
+  const ChatMessagesErrorState(this.message);
+
+  final String message;
+
+  @override
+  List<Object> get props => [message];
+}
+

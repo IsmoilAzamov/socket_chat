@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 Future hasNetwork() async {
   //check if there is internet connection
+try{
   bool hasNetwork = false;
   String url = 'https://www.google.com/';
   Dio dio = Dio();
@@ -14,4 +15,7 @@ Future hasNetwork() async {
     hasNetwork = false;
   }
   return hasNetwork;
+} catch (e) {
+  return false;
+}
 }

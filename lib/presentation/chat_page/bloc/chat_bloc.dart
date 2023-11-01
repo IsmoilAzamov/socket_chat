@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:socket/common/utils/has_network.dart';
 import 'package:socket/domain/chat_model.dart';
 
 import '../../../main.dart';
@@ -12,12 +13,14 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
 
   ChatBloc() : super(ChatInitialState()) {
-    on<ChatStartedEvent>((event, emit) {
+    on<ChatStartedEvent>((event, emit)async {
       // channel.sink.add('{"event":"pusher:subscribe","data":{"channel":"Test"}}');
       List<dynamic> list = box.get('messages', defaultValue: []);
       messages = list.map((e) => e as MessageModel).toList();
-
-      emit(ChatMessagesLoadedState(messages));
+      if(await hasNetwork()){
+      emit(ChatMessagesLoadedState(messages));}else{
+        emit(const ChatMessagesErrorState('No internet connection'));
+      }
     });
 
     on<ChatMessageReceivedEvent>((event, emit) {

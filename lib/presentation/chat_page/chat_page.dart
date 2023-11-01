@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:socket/data/chat_socket_client.dart';
 import 'package:socket/presentation/chat_page/widgets/message_item.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:socket/presentation/widgets/error_toast.dart';
 
 import '../../common/utils/has_network.dart';
 import 'bloc/chat_bloc.dart';
@@ -34,85 +35,36 @@ class _MyHomePageState extends State<ChatPage> with SingleTickerProviderStateMix
   bool isListening = false;
   String photo = "";
 
-  _getPhoto() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      //get base64 photo from image
-      if (mounted) {
-        showDialog(
-            context: context,
-            builder: (context) {
-              return AlertDialog(
-                title: const Text("Do you want to send this photo?"),
-                content: SizedBox(
-                    height: 200,
-                    width: 200,
-                    child: Image.file(File(image.path), fit: BoxFit.cover, frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                      if (wasSynchronouslyLoaded) {
-                        return child;
-                      } else {
-                        return AnimatedOpacity(
-                          opacity: frame == null ? 0 : 1,
-                          duration: const Duration(seconds: 1),
-                          curve: Curves.easeOut,
-                          child: child,
-                        );
-                      }
-                    }, errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Text("Error"),
-                      );
-                    })),
-                actions: [
-                  TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
-                      child: const Text("Cancel", style: TextStyle(color: Colors.black, fontSize: 18))),
-                  TextButton(
-                      onPressed: () async {
-                        final File imageTemporary = File(image.path);
-                        final imagePermanent = await saveImagePermanently(imageTemporary);
-                        photo = base64Encode(imagePermanent.readAsBytesSync());
-                        _bloc.add(ChatPhotoSelectedState(photo));
-                        setState(() {});
-                        if (mounted) Navigator.of(context).pop();
-                      },
-                      child: const Text("Send", style: TextStyle(color: Colors.red, fontSize: 18))),
-                ],
-              );
-            });
-      }
-    }
-  }
 
-  Future<File> saveImagePermanently(File imageTemporary) async {
-    final directory = await getApplicationDocumentsDirectory();
-    final imagePermanent = await imageTemporary.copy('${directory.path}/${imageTemporary.path.split('/').last}');
-    return imagePermanent;
-  }
 
   ChatSocketClient chatSocketClient = ChatSocketClient();
 
   @override
   void initState() {
-    _bloc.add(ChatStartedEvent());
-    chatSocketClient.subscribe();
-    chatSocketClient.channel.stream.listen((event) {
-      if (event.contains("message")) {
-        chatSocketClient.sendMessage(_controller.text);
-        _bloc.add(ChatMessageReceivedEvent(event));
-      }
-      setState(() {});
-    }, onDone: () {
-      print('Done');
-    }, onError: (error) {
-      _bloc.add(ChatMessageReceivedEvent(error.toString()));
-      print(error.toString());
-    });
-    //check subscription
+    _initSocket();
 
     super.initState();
+  }
+
+  _initSocket() async {
+    _bloc.add(ChatStartedEvent());
+    if (await hasNetwork()) {
+      chatSocketClient.subscribe();
+      chatSocketClient.channel.stream.listen((event) {
+
+        if (event.contains("message")) {
+          chatSocketClient.sendMessage(_controller.text);
+          _bloc.add(ChatMessageReceivedEvent(event));
+        }
+        setState(() {});
+      }, onDone: () {
+        print('Done');
+      }, onError: (error) {
+        _bloc.add(ChatMessageReceivedEvent(error.toString()));
+        print(error.toString());
+      });
+    }
+    //check subscription
   }
 
   @override
@@ -141,6 +93,35 @@ class _MyHomePageState extends State<ChatPage> with SingleTickerProviderStateMix
               BlocBuilder<ChatBloc, ChatState>(
                   bloc: _bloc,
                   builder: (context, state) {
+                    if (state is ChatMessagesErrorState) {
+                      return Expanded(
+                          child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Center(
+                              child: Text(
+                            'No internet connection',
+                            style: TextStyle(color: Colors.black45, fontSize: 18, fontWeight: FontWeight.w400),
+                          )),
+                          const SizedBox(
+                            height: 16,
+                          ),
+                          SizedBox(
+                            width: 120,
+                            height: 40,
+                            child: ElevatedButton(
+                                onPressed: () {
+                                  _bloc.add(ChatStartedEvent());
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xffffbb00),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: const Text("Retry")),
+                          )
+                        ],
+                      ));
+                    }
                     if (state is ChatInitialState) {
                       return const Expanded(
                           child: Column(
@@ -268,6 +249,7 @@ class _MyHomePageState extends State<ChatPage> with SingleTickerProviderStateMix
                     MediaQuery.of(context).viewInsets.bottom > 0.0
                         ? IconButton(
                             onPressed: () async {
+
                               if (await hasNetwork()) {
                                 if (_controller.text.isNotEmpty) {
                                   _bloc.add(ChatMessageSentEvent(_controller.text));
@@ -275,6 +257,8 @@ class _MyHomePageState extends State<ChatPage> with SingleTickerProviderStateMix
                                   _controller.clear();
                                   if (mounted) FocusScope.of(context).unfocus();
                                 }
+                              } else {
+                                errorToast("No internet connection");
                               }
                             },
                             icon: const Icon(
@@ -301,5 +285,63 @@ class _MyHomePageState extends State<ChatPage> with SingleTickerProviderStateMix
         ),
       ),
     );
+  }
+
+  _getPhoto() async {
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      //get base64 photo from image
+      if (mounted) {
+        showDialog(
+            context: context,
+            builder: (context) {
+              return AlertDialog(
+                title: const Text("Do you want to send this photo?"),
+                content: SizedBox(
+                    height: 200,
+                    width: 200,
+                    child: Image.file(File(image.path), fit: BoxFit.cover, frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded) {
+                        return child;
+                      } else {
+                        return AnimatedOpacity(
+                          opacity: frame == null ? 0 : 1,
+                          duration: const Duration(seconds: 1),
+                          curve: Curves.easeOut,
+                          child: child,
+                        );
+                      }
+                    }, errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Text("Error"),
+                      );
+                    })),
+                actions: [
+                  TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text("Cancel", style: TextStyle(color: Colors.black, fontSize: 18))),
+                  TextButton(
+                      onPressed: () async {
+                        final File imageTemporary = File(image.path);
+                        final imagePermanent = await saveImagePermanently(imageTemporary);
+                        photo = base64Encode(imagePermanent.readAsBytesSync());
+                        _bloc.add(ChatPhotoSelectedState(photo));
+                        setState(() {});
+                        if (mounted) Navigator.of(context).pop();
+                      },
+                      child: const Text("Send", style: TextStyle(color: Colors.red, fontSize: 18))),
+                ],
+              );
+            });
+      }
+    }
+  }
+
+  Future<File> saveImagePermanently(File imageTemporary) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final imagePermanent = await imageTemporary.copy('${directory.path}/${imageTemporary.path.split('/').last}');
+    return imagePermanent;
   }
 }

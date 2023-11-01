@@ -8,8 +8,12 @@ class ChatSocketClient {
       headers: {'websocket': 'pusher', 'connection': 'Upgrade', 'channel': 'Test'});
 
   void sendMessage(String message) {
-    //channel Test, event test
-    channel.sink.add('{"event":"test","data":{"message":"$message"}}');
+    //channel Test ga yozish
+   String str="""{"channel":"Test", "event":"test", "data":"{\\"message\\":\\"$message\\"}"}""";
+   print(str);
+  channel.sink.add(str);
+
+
   }
 
   void subscribe() {
@@ -26,4 +30,6 @@ class ChatSocketClient {
   Future<bool> isConnect()async{
     return await channel.sink.done;
   }
+
+
 }
